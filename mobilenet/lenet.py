@@ -27,7 +27,9 @@ random_seed=2
 def model():
     X_train, Y_train = loader_train()
     test = loader_test()
-    X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.1, random_state=random_seed)
+    X_train = X_train.reshape(-1, 28, 28, 1)
+    test = test.reshape(-1, 28, 28, 1)
+    X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.3, random_state=random_seed)
     model = Sequential()
 
     model.add(Conv2D(filters=32, kernel_size=(5, 5), padding='Same',
@@ -49,13 +51,13 @@ def model():
     optimizer = Adam(lr=1e-4, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
     model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=["accuracy"])
     learning_rate_reduction = ReduceLROnPlateau(monitor='val_acc',
-                                                patience=3,
+                                                patience=2,
                                                 verbose=1,
                                                 factor=0.5,
                                                 min_lr=1e-6)
 
     epochs = 50
-    batch_size = 128
+    batch_size = 64
     datagen = ImageDataGenerator(
         featurewise_center=False,  # set input mean to 0 over the dataset
         samplewise_center=False,  # set each sample mean to 0
@@ -75,7 +77,10 @@ def model():
                                   verbose=2, steps_per_epoch=X_train.shape[0] // batch_size
                                   , callbacks=[learning_rate_reduction])
     results = model.predict(test)
-    submit(results)
+    # try :
+    submit(np.argmax(results, axis=1))
+    # except:
+
 
 if __name__=='__main__':
     model()
