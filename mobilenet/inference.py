@@ -8,24 +8,31 @@
 import tensorflow as tf
 from keras.applications.mobilenet_v2 import MobileNetV2
 from keras.preprocessing import image
-from keras.models import Model
+from keras.models import Model, load_model
 from keras.layers import Dense, GlobalAveragePooling2D
 from keras.optimizers import Adam
 from keras.callbacks import ReduceLROnPlateau
 from keras.utils.np_utils import to_categorical
 import numpy as np
 import pandas as pd
-from dataloader import loader_train, loader_test, submit
+from dataloader import loader_train, loader_test, submit, dog_and_cat
 from lenet import model
 from keras.preprocessing.image import ImageDataGenerator
 from sklearn.model_selection import train_test_split
+import os
 # from keras import backend as K
 
 class MobileNet:
-    def __init__(self):
+    """
+    mobilenet to complete classify task
+    method: __inference, train, eval, predict
+    """
+    def __init__(self, classes):
         self.model = None
+        self.classes = classes
+        self.train_flag = True
 
-    def __inference(self,num_classes=10):
+    def __inference(self):
         """
         forward
         :param:num_classes the number of class you want to classify
@@ -35,60 +42,61 @@ class MobileNet:
 
         # add a global spatial average pooling layer
         x = base_model.output
-        print(x.get_shape())
+        # print(x.get_shape())
         x = GlobalAveragePooling2D()(x)
         # add a fully-connected layer
         x = Dense(512, activation='relu')(x)
         # and a softmax logistic layer
-        predictions = Dense(num_classes, activation='softmax')(x)
+        predictions = Dense(self.classes, activation='softmax')(x)
 
         # this is the model we will train
         model = Model(inputs=base_model.input, outputs=predictions)
 
         # frozen the weights of base model
         # for layer in base_model.layers:
-        #    layer.trainable = False
+        #   layer.trainable = False
 
         return model
 
-    def train(self, x_train, y_train, batch_size=32, epochs=50):
+    def train(self, x_train, y_train, batch_size=32, epochs=100, train=True):
         """
         pre-train the model
-        :param x_train: input tensor,shape[228,228,3]
+        :param x_train: input tensor,shape[num,228,228,3]
         :param y_train: one hot encoding
-        :param batch_size:
-        :return:
+        :param batch_size:default 32
+        :param epochs: the number of training step
+        :param train: if true, train from scratch, if false, load the model form h5 file
+        :return: None
         """
-        x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.3)
-        model = self.__inference()
-        optimizer = Adam(lr=1e-6, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-        model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=["accuracy"])
-        learning_rate_reduction = ReduceLROnPlateau(monitor='val_acc',
-                                                    patience=3,
-                                                    verbose=1,
-                                                    factor=0.5,
-                                                    min_lr=1e-8)
+        if train:
+            x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.1)
+            model = self.__inference()
+            optimizer = Adam(lr=1e-4, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
 
-        datagen = ImageDataGenerator(
-            featurewise_center=False,  # set input mean to 0 over the dataset
-            samplewise_center=False,  # set each sample mean to 0
-            featurewise_std_normalization=False,  # divide inputs by std of the dataset
-            samplewise_std_normalization=False,  # divide each input by its std
-            zca_whitening=False,  # apply ZCA whitening
-            rotation_range=10,  # randomly rotate images in the range (degrees, 0 to 180)
-            zoom_range=0.1,  # Randomly zoom image
-            width_shift_range=0.1,  # randomly shift images horizontally (fraction of total width)
-            height_shift_range=0.1,  # randomly shift images vertically (fraction of total height)
-            horizontal_flip=False,  # randomly flip images
-            vertical_flip=False)  # randomly flip images
+            model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=["accuracy"])
+            learning_rate_reduction = ReduceLROnPlateau(monitor='val_acc',
+                                                        patience=3,
+                                                        verbose=1,
+                                                        factor=0.5,
+                                                        min_lr=1e-8)
 
-        datagen.fit(x_train)
-        history = model.fit_generator(datagen.flow(x_train, y_train, batch_size=batch_size),
-                                      epochs=epochs, validation_data=(x_val, y_val),
-                                      verbose=2, steps_per_epoch=x_train.shape[0] // batch_size
-                                      , callbacks=[learning_rate_reduction])
+            model.fit(x_train, y_train,
+                      batch_size=batch_size,
+                      epochs=epochs,
+                      validation_data=(x_val, y_val),
+                      verbose=2, callbacks=[learning_rate_reduction])
 
-        self.model  = model
+            self.model  = model
+            model.save('mobilenet.h5')
+        else :
+            model = load_model('mobilenet.h5')
+            self.model = model
+
+    def eval(self, x_eval, y_eval):
+        model = self.model
+        accuracy = model.evaluate(x_eval, y_eval, verbose=1)
+
+        return accuracy
 
     def predict(self,  x_test):
         model = self.model
@@ -128,24 +136,16 @@ def preprocess(x_train, x_test):
 
 
 if __name__=='__main__':
-    model()
-    # load data
-    """x_train, y_train = loader_train()
-    x_test = loader_test()
-
-    # print(x_train.shape)
-    # print(x_test.shape)
-    # preprocess
-    x_train, x_test = preprocess(x_train, x_test)
-    print(x_train[1,:,:,:].sum())
+    x_train, y_train, x_test, y_test = dog_and_cat()
+    # print(x_train.shape, y_train.shape)
 
     # create model instance and train
-    mobile = MobileNet()
-    mobile.train(x_train, y_train)
+    mobile = MobileNet(2)
+    mobile.train(x_train, y_train, train=False)
     
-    # predict
-    y = mobile.predict(x_test)
-    submit(y)
-    print('complete...')"""
+    # eval
+    acc = mobile.eval(x_test, y_test)
+    print('the test loss is {}, the test accuracy is {}'.format(acc[0], acc[1]))
+    print('complete...')
 
 

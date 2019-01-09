@@ -9,6 +9,11 @@ import numpy as np
 import pandas as pd
 from sklearn import preprocessing
 import warnings
+import os
+import time
+from PIL import Image
+from tqdm import  tqdm
+import matplotlib.pyplot as plt
 warnings.filterwarnings("ignore")
 
 
@@ -86,6 +91,80 @@ def submit(y, filename='result.csv'):
         id.append(i)
     result = pd.DataFrame({'ImageId':id, 'Label':y})
     result.to_csv(filename, index=False, header=True)
+
+
+def dog_and_cat():
+    """
+    load the cat and dog dataset. using numpy and PIL, next time, I will try keras
+    to load file directly.
+    :return: numpy ndarray shape[number, height, width, 3]
+    """
+    path = os.path.join(os.getcwd(), 'data/cat-and-dog/train')
+    path_ = os.path.join(os.getcwd(), 'data/cat-and-dog/test')
+
+    # this a bug in load data from .npy file
+    if os.path.exists(path) and os.path.exists(path_):
+        start = time.time()
+        print("**** load data from .npy file ****")
+        x_train = np.load(os.path.join(path, 'x.npy'))
+        y_train = np.load(os.path.join(path, 'y.npy'))
+        x_test = np.load(os.path.join(path_, 'x.npy'))
+        y_test = np.load(os.path.join(path_, 'y.npy'))
+        end = time.time() - start
+        print("**** data has been load, spend {} second ****".format(end))
+    else:
+        start = time.time()
+        print("**** load data from picture, it takes a while ****")
+        _path = '/data/cat-and-dog/training_set/'
+        print('load train')
+        x_train, y_train = _dog_and_cat(_path)
+        _path = '/data/cat-and-dog/test_set/'
+        x_test, y_test = _dog_and_cat(_path)
+        if not os.path.exists(path):
+            os.mkdir(path)
+        if not os.path.exists(path_):
+            os.mkdir(path_)
+
+        # save file as .npy format, beacuse it takes a long time to load data from image
+        np.save(os.path.join(path, 'x.npy'), x_train)
+        np.save(os.path.join(path, 'y.npy'), y_train)
+        np.save(os.path.join(path_, 'x.npy'), x_test)
+        np.save(os.path.join(path_, 'y.npy'), y_test)
+        end = time.time() - start
+        print("**** data has been load, spend {} seconds ****".format(end))
+
+    return x_train, y_train, x_test, y_test
+
+
+def _dog_and_cat(_path):
+    dir_path = os.getcwd()
+    # _path = '/data/cat-and-dog/training_set/'
+    path = dir_path + _path
+    # x is feature, y is label
+    x = []
+    y = []
+    for animal in os.listdir(path):
+        animal = os.path.join(path,animal)
+        imgs = []
+        for img_path in tqdm(os.listdir(animal)):
+            img_path = os.path.join(animal, img_path)
+            # resize the img
+            img = Image.open(img_path).resize((40, 40))
+            img = np.array(img)
+            imgs.append(img)
+        label = [animal.split(r'/')[-1]]*len(imgs)
+        y.extend(label)
+        x.extend(imgs)
+
+    y = np.array(y).reshape(-1,1)
+    enc = preprocessing.OneHotEncoder()
+    enc.fit(y)
+    y = enc.transform(y).toarray()
+    # print(type(y))
+    # y = np.array(y)
+    x = np.array(x)
+    # np.save(os.path.join(dir_path,'/data/cat-and-dog/training_x.npz'), x)
+    return x,y
 
 
 if __name__ == '__main__':
