@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="ce84cff4-d1c1-4929-84c8-a47c9b356080" name="tensor" url="http://192.168.2.134">
+        <fileTransfer host="192.168.2.134" port="9002" rootFolder="/home/spl/chuyutensor" accessType="SFTP">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+          <option name="port" value="9002" />
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

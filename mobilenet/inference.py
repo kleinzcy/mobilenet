@@ -60,7 +60,7 @@ class MobileNet:
 
     def train(self, x_train, y_train, batch_size=32, epochs=100, train=True):
         """
-        pre-train the model
+        pre-train or train from scartch the model
         :param x_train: input tensor,shape[num,228,228,3]
         :param y_train: one hot encoding
         :param batch_size:default 32
